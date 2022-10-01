@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Design your own Geoffrey</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<link type="text/css" rel="stylesheet" href="main.css">
+		<style>
+			body {
+                margin-top: 50;
+				color: #bbbbbb;
+				background: #333333;
+			}
+			a {
+				color: #08f;
+			}
+			.colorPicker {
+				display: inline-block;
+				margin: 0 10px
+			}
+		</style>
+	</head>
+
+	<body>
+		<div id="info">
+			<span class="colorPicker"><input id="body-color" type="color" value="#ff0000"></input><br/>Tiny Mile</span>
+			<span class="colorPicker"><input id="sponsor-color" type="color" value="#ff0000"></input><br/>Sponsor</span>
+			<span class="colorPicker"><input id="details-color" type="color" value="#000000"></input><br/>Details</span>
+		</div>
+		<div id="container"></div>
+
+		<script type="module">
+			import * as THREE from 'three';
+			import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+			import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+			import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+			import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
+			let camera, scene, renderer;
+			let grid;
+			let controls;
+
+			const wheels = [];
+
+			function init() {
+
+				const container = document.getElementById( 'container' );
+
+				renderer = new THREE.WebGLRenderer( { antialias: true } );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.setAnimationLoop( render );
+				renderer.outputEncoding = THREE.sRGBEncoding;
+				renderer.toneMapping = THREE.ACESFilmicToneMapping;
+				renderer.toneMappingExposure = 0.85;
+				container.appendChild( renderer.domElement );
+
+				window.addEventListener( 'resize', onWindowResize );
+
+
+				//
+
+				camera = new THREE.PerspectiveCamera( 40, window.innerWidth / window.innerHeight, 0.1, 100);
+				camera.position.set( 4.25, 1.4, - 4.5 );
+
+				controls = new OrbitControls( camera, container );
+				controls.enableDamping = true;
+				controls.maxDistance = 9;
+				controls.target.set( 0, 0.5, 0 );
+				controls.update();
+
+				scene = new THREE.Scene();
+				scene.background = new THREE.Color( 0x333333 );
+				scene.environment = new RGBELoader().load( 'venice_sunset_1k.hdr' );
+				scene.environment.mapping = THREE.EquirectangularReflectionMapping;
+				scene.fog = new THREE.Fog( 0x333333, 10, 15 );
+
+				grid = new THREE.GridHelper( 20, 20, 0xffffff, 0xffffff );
+				grid.material.opacity = 0.2;
+				grid.material.depthWrite = false;
+				grid.material.transparent = true;
+				scene.add( grid );
+
+				// materials
+
+				const bodyMaterial = new THREE.MeshPhysicalMaterial( {
+					color: 0xff0000, metalness: 1.0, 
+                    roughness: 0.5, clearcoat: 1.0, clearcoatRoughness: 0.03, sheen: 0.5
+				} );
+
+				const sponsorMaterial = new THREE.MeshPhysicalMaterial( {
+					color: 0xff0000, metalness: 1.0, 
+                    roughness: 0.5, clearcoat: 1.0, clearcoatRoughness: 0.03, sheen: 0.5
+				} );
+
+
+				const glassMaterial = new THREE.MeshPhysicalMaterial( {
+					color: 0xffbd23, metalness: 0.25, roughness: 0, transmission: 1.0
+				} );
+
+
+				const detailsMaterial = new THREE.MeshStandardMaterial( {
+					color: 0x000000, metalness: 0.0, roughness: 0.9
+				} );
+
+
+				const bodyColorInput = document.getElementById( 'body-color' );
+				bodyColorInput.addEventListener( 'input', function () {
+
+					bodyMaterial.color.set( this.value );
+
+				} );
+
+				const detailsColorInput = document.getElementById( 'details-color' );
+				detailsColorInput.addEventListener( 'input', function () {
+
+					detailsMaterial.color.set( this.value );
+
+				} );
+
+				const sponsorColorInput = document.getElementById( 'sponsor-color' );
+				sponsorColorInput.addEventListener( 'input', function () {
+					sponsorMaterial.color.set( this.value );
+
+				} );
+
+
+                const tireMaterial = new THREE.MeshLambertMaterial({ color: 0xa52523 });
+
+				// Car
+
+				const shadow = new THREE.TextureLoader().load( 'shadow.png' );
+
+				//const dracoLoader = new DRACOLoader();
+				//dracoLoader.setDecoderPath( 'js/libs/draco/gltf/' );
+
+				const loader = new GLTFLoader();
+				//loader.setDRACOLoader( dracoLoader );
+
+				loader.load( 'robot.glb', function ( gltf ) {
+
+					const carModel = gltf.scene.children[ 0 ];
+                    console.log(carModel);
+
+					carModel.getObjectByName( '10-00007' ).material = bodyMaterial; // front panel
+					carModel.getObjectByName( '10-00011' ).material = bodyMaterial; // rear panel
+					carModel.getObjectByName( '10-00006001' ).material = bodyMaterial; // bottom panel
+					carModel.getObjectByName( '10-00013' ).material = sponsorMaterial; // right panel
+					carModel.getObjectByName( '10-00015' ).material = sponsorMaterial; // lid panel
+					carModel.getObjectByName( '10-00012' ).material = sponsorMaterial; // left panel
+
+                    // Wheels covers
+					carModel.getObjectByName( '11-00001001' ).material = detailsMaterial; // pole
+					carModel.getObjectByName( '10-00040001' ).material = detailsMaterial; // pole
+					carModel.getObjectByName( '10-00040' ).material = detailsMaterial; // pole
+					carModel.getObjectByName( 'Xiaomi_Fork' ).material = detailsMaterial; // pole
+                    
+                    // camera
+					carModel.getObjectByName( 'body' ).material = detailsMaterial;
+					carModel.getObjectByName( 'hatch' ).material = detailsMaterial;
+					carModel.getObjectByName( 'pcb' ).material = detailsMaterial;
+					carModel.getObjectByName( 'pcb001' ).material = detailsMaterial;
+					carModel.getObjectByName( 'dome' ).material = glassMaterial;
+
+                    // Wheels
+					carModel.getObjectByName( '85_inch_250w_hubmotor_L001' ).material = tireMaterial;
+					carModel.getObjectByName( '85_inch_250w_hubmotor_F' ).material = tireMaterial;
+					carModel.getObjectByName( '85_inch_250w_hubmotor_R' ).material = tireMaterial;
+                    
+                    
+					wheels.push(
+						carModel.getObjectByName( 'wheel_fl' ),
+						carModel.getObjectByName( 'wheel_fr' ),
+						carModel.getObjectByName( 'wheel_rl' ),
+						carModel.getObjectByName( 'wheel_rr' )
+					);
+
+					// shadow
+					const mesh = new THREE.Mesh(
+						new THREE.PlaneGeometry( 0.6, 1.1 ),
+						new THREE.MeshBasicMaterial( {
+							map: shadow, 
+                            blending: THREE.MultiplyBlending, 
+                            toneMapped: false, 
+                            transparent: true
+						} )
+					);
+
+					mesh.renderOrder = 2;
+                    mesh.position.z = -0.12;
+					mesh.rotation.z = - Math.PI;
+                    mesh.position.y = -0.1;
+					carModel.rotation.x = - Math.PI / 2;
+					carModel.rotation.z = - Math.PI;
+					carModel.add( mesh );
+                    carModel.position.y = 0.12;
+
+					scene.add( carModel );
+
+				} );
+
+			}
+
+			function onWindowResize() {
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize( window.innerWidth, window.innerHeight );
+			}
+
+			function render() {
+				controls.update();
+				const time = - performance.now() / 1000;
+				for ( let i = 0; i < wheels.length; i ++ ) {
+					//wheels[ i ].rotation.x = time * Math.PI / 2.0;
+
+				}
+				grid.position.z = - ( time ) % 1;
+				renderer.render( scene, camera );
+			}
+
+			init();
+
+		</script>
+
+	</body>
+</html>
